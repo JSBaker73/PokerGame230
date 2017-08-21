@@ -1,6 +1,6 @@
 #include <iostream>
 #include <string>
-#include <locale>>
+#include <locale>
 #include <cstdlib>
 #include <ctime>
 #include <crtdbg.h>
@@ -17,13 +17,14 @@
 using namespace std;
 
 //Enums
-enum suit {Spades, Hearts, Clubs, Diamonds};
+enum suit {Clubs, Diamonds, Hearts, Spades};
 
 //Structs
 struct card
 {
 	int		theNumber;
 	suit	theSuit;
+	bool	wasReplaced;
 };
 struct node
 {
@@ -42,9 +43,9 @@ struct dll
 card	NewCard(int, suit);
 string	PrintCard(card);
 node*	NewNode(card);
-void	DeleteNode(node*);
+void	DeleteNode(node*&);
 dll*	NewDLL();
-void	DeleteDLL(dll*);
+void	DeleteDLL(dll*&);
 void	AddNodeFirst(dll*, node*);
 void	AddNodeLast(dll*, node*);
 node*	GetNode(dll*, int);
@@ -53,12 +54,16 @@ void	CopyNode(dll*, node*);
 void	SwapNode(node*, node*);
 void	TransferNode(dll*, dll*, node*);
 void	SortDLL(dll*);
-void	CreateDeck(dll*);
+void	CreateDeck(dll*&);
 void	ShuffleDeck(dll*, dll*);
 void	PrintDeck(dll*);
+void	PrintHand(dll*);
 bool	DrawCard(dll*, dll*);
-void	DrawNewHand(dll*, dll*);
+void	DrawNewHand(dll*, dll*, dll*);
+void	DiscardCard(dll*, dll*, int);
 void	ReplaceCards(char[]);
+int		FindCard(dll*, int, int);
+void	VictoryCheck(dll*);
 int		CheckInputI(int);
 bool	CheckInputS(string);
 
@@ -72,27 +77,254 @@ int		money;
 int		replaced;
 int		inputI;
 bool	gameRunning;
-bool	replacingCards;
+bool	gamePlaying;
+bool	stillPlaying;
+bool	badInput;
+bool	discarding;
+bool	deckPrint;
+bool	debugSwap;
 
 int main()
 {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF |
 		_CRTDBG_LEAK_CHECK_DF);
 
-	//Seed Random
+	// Seed Random
 	srand((unsigned)time(NULL));
 
-	//Initiallize Variables
-	discard = NewDLL();
-	CreateDeck(discard);
-	replaced = 0;
-	replacingCards = false;
+	// Game Loop
+	do
+	{
+		// Main Menu
+		do
+		{
+			cout << "Welcome to Video Poker!\nEnter \"1\" to start the game\nEnter \"0\" to quit" << endl;
 
+			cin >> inputI;
+			inputI = CheckInputI(inputI);
 
-	cout << PrintCard(GetNode(discard, 38)->value) << endl;
-	system("pause");
+			if (inputI == 1)
+			{
+				gamePlaying = true;
+				stillPlaying = true;
+				badInput = false;
+			}
+			else if (inputI == 0)
+			{
+				gamePlaying = false;
+				stillPlaying = false;
+				badInput = false;
+			}
+			else
+			{
+				cout << "Input error! Please try again.\n" << endl;
+				badInput = true;
+			}
+		} while (badInput);
 
-	DeleteDLL(discard);
+		while (gamePlaying)
+		{
+			// Initiallize Variables
+			deck = NewDLL();
+			discard = NewDLL();
+			hand = NewDLL();
+			CreateDeck(discard);
+			ShuffleDeck(deck, discard);
+
+			money = 10;
+			replaced = 0;
+			discarding = false;
+
+			do
+			{
+				if (money > 0)
+				{
+					do
+					{
+						cout << "You currently have $" << money << "\nEnter \"1\" to pay $1 and draw a new hand\nEnter \"0\" to quit" << endl;
+
+						cin >> inputI;
+						inputI = CheckInputI(inputI);
+
+						if (inputI == 1)
+						{
+							stillPlaying = true;
+							gamePlaying = true;
+							badInput = false;
+						}
+						else if (inputI == 0)
+						{
+							stillPlaying = false;
+							gamePlaying = false;
+							badInput = false;
+						}
+						else
+						{
+							cout << "Input error! Please try again.\n" << endl;
+							badInput = true;
+						}
+					} while (badInput);
+				}
+				else
+				{
+					do
+					{
+						cout << "You currently have $" << money << "\nYou do not have enough to buy into another hand\nEnter\"1\" to play again\nEnter \"0\" to quit" << endl;
+
+						cin >> inputI;
+						inputI = CheckInputI(inputI);
+
+						if (inputI == 0)
+						{
+							stillPlaying = false;
+							gamePlaying = false;
+							badInput = false;
+						}
+						else if (inputI == 1)
+						{
+							stillPlaying = false;
+							gamePlaying = true;
+							badInput = false;
+						}
+						else
+						{
+							cout << "Input error! Please try again.\n" << endl;
+							badInput = true;
+						}
+					} while (badInput);
+				}
+
+				if (stillPlaying)
+				{
+					money -= 1;
+					DrawNewHand(deck, hand, discard);
+					SortDLL(hand);
+
+					do
+					{
+						discarding = false;
+						cout << "Your hand:" << endl;
+						PrintHand(hand);
+						cout << endl;
+						cout << "Choose which cards you want to keep by entering a list of their letters\nAll of the letters must be capitalized and there shouldn't be any spaces\nExample: BCE\nEnter \"0\" if you don't want to keep any cards\nDEBUG: Enter \"deck\" to list all of the cards available in the deck\nDEBUG: Enter \"swap\" to swap specific cards in your hand with others in the deck" << endl;
+						
+						discarding = true;
+						debugSwap = false;
+						deckPrint = false;
+						cin >> inputS;
+						badInput = CheckInputS(inputS);
+
+						if (debugSwap)
+						{
+							int pos = 0;
+							int suit = 0;
+							int value = 0;
+							bool tempBadInput = false;
+
+							do
+							{
+								cout << "Which card are you swapping?\nEnter a capital letter A-E" << endl;
+
+								cin >> inputS;
+								if (CheckInputS(inputS))
+								{
+									pos = int(inputS[0]) - 'A';
+									tempBadInput = false;
+								}
+								else
+								{
+									cout << "Input error! Please try again.\n" << endl;
+									tempBadInput = true;
+								}
+
+							} while (tempBadInput);
+
+							do
+							{
+								cout << "What suit do you want?\nEnter a number 1-4\nClubs = 1      Diamonds = 2\nHearts = 3     Spades = 4" << endl;
+
+								cin >> inputI;
+								inputI = CheckInputI(inputI);
+
+								if (inputI >= 1 && inputI <= 4)
+								{
+									suit = inputI;
+									tempBadInput = false;
+								}
+								else
+								{
+									cout << "Input error! Please try again.\n" << endl;
+									tempBadInput = true;
+								}
+							} while (tempBadInput);
+
+							do
+							{
+								cout << "What value do you want?\nEnter a number 1-13\nAce = 1       Jack = 11\nQueen = 12    King = 13" << endl;
+
+								cin >> inputI;
+								inputI = CheckInputI(inputI);
+
+								if (inputI >= 1 && inputI <= 13)
+								{
+									value = inputI;
+									tempBadInput = false;
+								}
+								else
+								{
+									cout << "Input error! Please try again.\n" << endl;
+									tempBadInput = true;
+								}
+							} while (tempBadInput);
+
+							int find = FindCard(hand, suit, value);
+							if (find != -1)
+							{	cout << "Sorry, that card is already in your hand.\n" << endl;	}
+							else
+							{
+								find = FindCard(deck, suit, value);
+								if (find != -1)
+								{
+									SwapNode(GetNode(hand, pos), GetNode(deck, find));
+									SortDLL(hand);
+								}
+								else
+								{
+									find = FindCard(discard, suit, value);
+									if (find != -1)
+									{
+										SwapNode(GetNode(hand, pos), GetNode(discard, find));
+										SortDLL(hand);
+									}
+									else
+									{	cout << "Huh? We couldn't find your card?\n" << endl;	}
+								}
+
+							}
+						}
+						else if(badInput && !deckPrint)
+						{	cout << "Input error! Please try again.\n" << endl;	}
+					} while (badInput);
+
+					SortDLL(hand);
+					cout << "You kept " << replaced << " cards. Your new hand: " << endl;
+					PrintHand(hand);
+
+					VictoryCheck(hand);
+					system("pause");
+
+					for (int i = 0; i < 5; i += 1)
+					{	DiscardCard(hand, discard, 0);	}
+
+					cout << endl;
+				}
+			} while (stillPlaying);
+
+			DeleteDLL(deck);
+			DeleteDLL(discard);
+			DeleteDLL(hand);
+		}
+	} while (gameRunning);
 
 	_CrtDumpMemoryLeaks();
 	return 0;
@@ -103,6 +335,7 @@ card NewCard(int aNumber, suit aSuit)
 	card aCard;
 	aCard.theNumber = aNumber;
 	aCard.theSuit = aSuit;
+	aCard.wasReplaced = false;
 	
 	return aCard;
 }
@@ -148,7 +381,7 @@ node* NewNode(card aCard)
 
 	return aNode;
 }
-void DeleteNode(node* aNode)
+void DeleteNode(node* &aNode)
 {
 	delete aNode;
 	aNode = NULL;
@@ -162,7 +395,7 @@ dll* NewDLL()
 
 	return aDLL;
 }
-void DeleteDLL(dll* aDLL)
+void DeleteDLL(dll* &aDLL)
 {
 	while (aDLL->length > 0)
 	{	RemoveNode(aDLL, aDLL->head);	}
@@ -228,7 +461,7 @@ void SwapNode(node* item1, node* item2)
 	card tempCard = item1->value;
 
 	item1->value = item2->value;
-	item2->value = item1->value;
+	item2->value = tempCard;
 }
 void TransferNode(dll* oldDLL, dll* newDLL, node* aNode)
 {
@@ -264,7 +497,7 @@ void SortDLL(dll* aDLL)
 		currentNode = currentNode->next;
 	}
 }
-void CreateDeck(dll* aDeck)
+void CreateDeck(dll* &aDeck)
 {
 	for (int i = 0; i < 4; i += 1)
 	{
@@ -273,16 +506,16 @@ void CreateDeck(dll* aDeck)
 			switch (i)
 			{
 			case 0:
-				AddNodeFirst(aDeck, NewNode(NewCard(j, Spades)));
-				break;
-			case 1:
-				AddNodeFirst(aDeck, NewNode(NewCard(j, Hearts)));
-				break;
-			case 2:
 				AddNodeFirst(aDeck, NewNode(NewCard(j, Clubs)));
 				break;
-			case 3:
+			case 1:
 				AddNodeFirst(aDeck, NewNode(NewCard(j, Diamonds)));
+				break;
+			case 2:
+				AddNodeFirst(aDeck, NewNode(NewCard(j, Hearts)));
+				break;
+			case 3:
+				AddNodeFirst(aDeck, NewNode(NewCard(j, Spades)));
 				break;
 			}
 		}
@@ -311,6 +544,61 @@ void PrintDeck(dll* aDeck)
 	{
 		cout << PrintCard(currentNode->value) << endl;
 		currentNode = currentNode->next;
+	}
+
+	DeleteDLL(sortedDeck);
+}
+void PrintHand(dll* aHand)
+{
+	dll* sortedDeck = NewDLL();
+	node* currentNode = aHand->head;
+
+	while (currentNode != NULL)
+	{
+		CopyNode(sortedDeck, currentNode);
+		currentNode = currentNode->next;
+	}
+	SortDLL(sortedDeck);
+
+	currentNode = sortedDeck->head;
+
+	for (int i = 0; i < 5; i += 1)
+	{
+		switch (i)
+		{
+		case 0:
+			cout << "A: ";
+			break;
+		case 1:
+			cout << "B: ";
+			break;
+		case 2:
+			cout << "C: ";
+			break;
+		case 3:
+			cout << "D: ";
+			break;
+		case 4:
+			cout << "E: ";
+			break;
+		}
+
+		cout << PrintCard(currentNode->value);
+		if (currentNode->value.wasReplaced)
+		{	currentNode->value.wasReplaced = false;	}
+		else if (discarding)
+		{	cout << " (Kept)";	}
+		cout << endl;
+		currentNode = currentNode->next;
+	}
+	if (currentNode != NULL)
+	{
+		cout << "Error Here" << endl;
+
+		while (currentNode != NULL)
+		{
+			cout << PrintCard(currentNode->value) << endl;
+		}
 	}
 
 	DeleteDLL(sortedDeck);
@@ -347,33 +635,251 @@ void ReplaceCards(char theCodes[])
 		case 'A':
 			SwapNode(deck->head, GetNode(hand, 0));
 			DiscardCard(deck, discard, 0);
-			replaced += 1;
+			GetNode(hand, 0)->value.wasReplaced = true;
 			break;
 		case 'B':
 			SwapNode(deck->head, GetNode(hand, 1));
 			DiscardCard(deck, discard, 0);
-			replaced += 1;
+			GetNode(hand, 1)->value.wasReplaced = true;
 			break;
 		case 'C':
 			SwapNode(deck->head, GetNode(hand, 2));
 			DiscardCard(deck, discard, 0);
-			replaced += 1;
+			GetNode(hand, 2)->value.wasReplaced = true;
 			break;
 		case 'D':
 			SwapNode(deck->head, GetNode(hand, 3));
 			DiscardCard(deck, discard, 0);
-			replaced += 1;
+			GetNode(hand, 3)->value.wasReplaced = true;
 			break;
 		case 'E':
 			SwapNode(deck->head, GetNode(hand, 4));
 			DiscardCard(deck, discard, 0);
-			replaced += 1;
+			GetNode(hand, 4)->value.wasReplaced = true;
 			break;
 		case '0':
 			return;
 			break;
 		}
 	}
+}
+int FindCard(dll* aDeck, int aSuit, int aValue)
+{
+	node* currentNode = aDeck->head;
+	int count = 0;
+
+	while (currentNode != NULL)
+	{
+		if (currentNode->value.theSuit == static_cast<suit>(aSuit-1) && currentNode->value.theNumber == aValue)
+		{	return count;	}
+		else
+		{
+			currentNode = currentNode->next;
+			count += 1;
+		}
+	}
+	return -1;
+}
+void VictoryCheck(dll* aHand)
+{
+	dll* tempHand = NewDLL();
+	node* currentNode;
+	suit aSuit;
+	int aNumber;
+	int count;
+	bool done = false;
+
+	// 0 = 1 Pair
+	// 1 = 2 Pair
+	// 2 = 3 of a Kind
+	// 3 = Straight
+	// 4 = Flush
+	// 5 = Full House
+	// 6 = 4 of a Kind
+	// 7 = Straight Flush
+	// 8 = Royal Flush
+	bool victories[9] = {false,false,false,false,false,false,false,false,false};
+
+	// Checking for matching numbers
+	while (aHand->length > 0 && !done)
+	{
+		count = 0;
+		currentNode = aHand->head;
+		aNumber = currentNode->value.theNumber;
+
+		while (currentNode != NULL)
+		{
+			if (currentNode->value.theNumber == aNumber)
+			{
+				TransferNode(aHand, tempHand, currentNode);
+				currentNode = aHand->head;
+				count += 1;
+			}
+			else
+			{	currentNode = currentNode->next;	}
+		}
+
+		if (count == 2)
+		{
+			if (victories[0])
+			{
+				victories[1] = true;
+				done = true;
+			}
+			else if (victories[2])
+			{
+				victories[5] = true;
+				done = true;
+			}
+			else
+			{	victories[0] = true;	}
+		}
+		else if (count == 3)
+		{
+			if (victories[0])
+			{
+				victories[5] = true;
+				done = true;
+			}
+			else
+			{	victories[2] = true;	}
+		}
+		else if (count == 4)
+		{
+			victories[6] = true;
+			done = true;
+		}
+	}
+	
+	if(victories[0])
+	{	done = true;	}
+
+	// Resetting hand
+	while (tempHand->length > 0)
+	{	TransferNode(tempHand, aHand, tempHand->head);	}
+
+	if (!done)
+	{
+		// Checking for straight and/or flush
+		int lowest = 15;
+		int nextLowest = 14;
+		int highest = 0;
+		currentNode = aHand->head;
+		aSuit = currentNode->value.theSuit;
+		count = 0;
+
+		for(int i = 0; i < 5; i += 1)
+		{
+			if (currentNode->value.theNumber < lowest)
+			{
+				nextLowest = lowest;
+				lowest = currentNode->value.theNumber;
+			}
+			else if (currentNode->value.theNumber < nextLowest)
+			{	nextLowest = currentNode->value.theNumber;	}
+
+			if (currentNode->value.theNumber > highest)
+			{	highest = currentNode->value.theNumber;	}
+
+			if (currentNode->value.theSuit == aSuit)
+			{	count += 1;	}
+
+			currentNode = currentNode->next;
+		}
+
+		if (highest - lowest == 4)
+		{	victories[3] = true;	}
+		else if (lowest == 1 && nextLowest == 10 && highest == 13)
+		{	victories[3] = true;	}
+		if (count == 5)
+		{	victories[4] = true;	}
+		if (victories[3] && victories[4])
+		{
+			victories[7] = true;
+			if (lowest == 1 && nextLowest == 10 && highest == 13)
+			{	victories[8] = true;	}
+		}
+	}
+
+	// Declaring victory
+	if (victories[8])
+	{
+		cout << "Congradulations! You got a Royal Flush and earned $800!!!" << endl;
+		money += 800;
+	}
+	else if (victories[7])
+	{
+		cout << "Congradulations! You got a Straight Flush and earned $50!!" << endl;
+		money += 50;
+	}
+	else if (victories[6])
+	{
+		cout << "Congradulations! You got Four of a Kind and earned $25!!" << endl;
+		money += 25;
+	}
+	else if (victories[5])
+	{
+		cout << "Congradulations! You got a Full House and earned $9!!" << endl;
+		money += 9;
+	}
+	else if (victories[4])
+	{
+		cout << "Congradulations! You got a Flush and earned $6!" << endl;
+		money += 6;
+	}
+	else if (victories[3])
+	{
+		cout << "Congradulations! You got a Straight and earned $4!" << endl;
+		money += 4;
+	}
+	else if (victories[2])
+	{
+		cout << "Congradulations! You got Three of a Kind and earned $3!" << endl;
+		money += 3;
+	}
+	else if (victories[1])
+	{
+		cout << "Congradulations! You got Two Pairs and earned $2!" << endl;
+		money += 2;
+	}
+	else if (victories[0])
+	{
+		for (int i = 0; i < 4; i += 1)
+		{
+			currentNode = aHand->head;
+			count = 0;
+
+			while (currentNode != NULL)
+			{
+				if (i == 0)
+				{
+					if (currentNode->value.theNumber == 1)
+					{	count += 1;	}
+				}
+				else
+				{
+					if (currentNode->value.theNumber == i + 10)
+					{	count += 1;	}
+				}
+
+				currentNode = currentNode->next;
+			}
+
+			if (count == 2)
+			{
+				cout << "Congradulations! You got One Pair (Jacks or Higher) and earned $1!" << endl;
+				money += 1;
+				break;
+			}
+		}
+
+		if (count != 2)
+		{	cout << "Sorry, your Pair wasn't of Jacks or higher. Better luck next time." << endl;	}
+	}
+	else
+	{	cout << "Sorry, you didn't get anything. Better luck next time." << endl;	}
+
+	DeleteDLL(tempHand);
 }
 int CheckInputI(int input)
 {
@@ -394,27 +900,43 @@ bool CheckInputS(string input)
 		cin.ignore();
 		return false;
 	}
+	else if (debugSwap)
+	{
+		if (input.length() == 1)
+		{
+			if (input[0] >= 'A' && input[0] <= 'E')
+			{	return true;	}
+		}
+
+		return false;
+	}
 	else
 	{
-		if (!replacingCards)
+		if (input == "deck")
 		{
-			if (input == "deck")
-			{
-				PrintDeck(deck);
-				return true;
-			}
-			if (input == "swap")
-			{
-				replacingCards = true;
-				return true;
-			}
-
-			return false;
+			PrintDeck(deck);
+			deckPrint = true;
+			cout << endl;
+			return discarding;
 		}
-		else
+		if (input == "swap")
 		{
+			debugSwap = true;
+			return discarding;
+		}
+		if (discarding)
+		{
+			replaced = 0;
+
 			if (input.length() <= 5 && input.length() > 0)
 			{
+				if (input == "0")
+				{
+					char all[5] = { 'A','B','C','D','E' };
+					ReplaceCards(all);
+					return false;
+				}
+
 				char codes[5] = { '0','0','0','0','0' };
 
 				for (int i = 0; i < input.length(); i += 1)
@@ -424,21 +946,47 @@ bool CheckInputS(string input)
 						for (int j = 0; j < i; j += 1)
 						{
 							if (input[i] == codes[j])
-							{	return false;	}
+							{	return true;	}
 						}
-
-						codes[i] = input[i];
+						
+						codes[(input[i] - 'A')] = input[i];
+						replaced += 1;
 					}
 					else
-					{	return false;	}
+					{	return true;	}
+				}
+
+				for (int i = 0; i < 5; i += 1)
+				{
+					if (codes[i] == '0')
+					{	codes[i] = 'A' + i;	}
+					else
+					{	codes[i] = '0';	}
+				}
+
+				for (int i = 0; i < 5; i += 1)
+				{
+					if (codes[i] == '0')
+					{
+						for (int j = i; j < 5; j += 1)
+						{
+							if (codes[j] != '0')
+							{
+								codes[i] = codes[j];
+								codes[j] = '0';
+								break;
+							}
+						}
+					}
 				}
 
 				ReplaceCards(codes);
-				replacingCards = false;
-				return true;
+				return false;
 			}
 			else
-			{	return false;	}
+			{	return true;	}
 		}
+		else
+		{	return true;	}
 	}
 }
